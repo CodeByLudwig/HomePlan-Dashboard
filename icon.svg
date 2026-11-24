@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="mzSquircle">
+      <rect x="8" y="8" width="496" height="496" rx="128" />
+    </clipPath>
+
+    <linearGradient id="mzBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f1b2d" />
+      <stop offset="55%" stop-color="#09111f" />
+      <stop offset="100%" stop-color="#040812" />
+    </linearGradient>
+
+    <radialGradient id="mzGlowTop" cx="25%" cy="20%" r="65%">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.45" />
+      <stop offset="60%" stop-color="#0284c7" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#09111f" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="mzGlowBot" cx="80%" cy="82%" r="60%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="#040812" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="mzRoof" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4" />
+      <stop offset="55%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+
+    <linearGradient id="mzWall" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95" />
+    </linearGradient>
+
+    <linearGradient id="mzBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.55" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.45" />
+    </linearGradient>
+
+    <filter id="mzGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <g clip-path="url(#mzSquircle)">
+    <rect x="8" y="8" width="496" height="496" rx="128" fill="url(#mzBg)" />
+    <rect x="8" y="8" width="496" height="496" rx="128" fill="url(#mzGlowTop)" />
+    <rect x="8" y="8" width="496" height="496" rx="128" fill="url(#mzGlowBot)" />
+
+    <!-- Subtle top glass sheen -->
+    <path d="M 8 135 C 8 60, 60 8, 135 8 L 377 8 C 452 8, 504 60, 504 135 C 370 185, 142 185, 8 135 Z" fill="#ffffff" opacity="0.06" />
+
+    <!-- House Body -->
+    <path d="M 126 232 L 256 128 L 386 232 L 386 368 C 386 382 374 394 360 394 L 152 394 C 138 394 126 382 126 368 Z" fill="url(#mzWall)" stroke="url(#mzRoof)" stroke-width="10" stroke-linejoin="round" />
+
+    <!-- Crisp Glowing Roof -->
+    <polyline points="98,242 256,114 414,242" fill="none" stroke="url(#mzRoof)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" filter="url(#mzGlow)" />
+
+    <!-- Smart Home Pulse / Light Core inside House -->
+    <circle cx="256" cy="278" r="44" fill="#14b8a6" opacity="0.22" filter="url(#mzGlow)" />
+    <rect x="220" y="242" width="72" height="72" rx="20" fill="#0b1220" stroke="#5eead4" stroke-width="6" />
+    <circle cx="256" cy="278" r="16" fill="#5eead4" filter="url(#mzGlow)" />
+    <circle cx="256" cy="278" r="8" fill="#ffffff" />
+  </g>
+
+  <rect x="8" y="8" width="496" height="496" rx="128" fill="none" stroke="url(#mzBorder)" stroke-width="5" />
+</svg>
