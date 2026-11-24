@@ -6,11 +6,11 @@
 
   const state = {
     isBridge,
-    token: metaToken || localStorage.getItem('mz_homey_token') || '',
+    token: metaToken || localStorage.getItem('mz_homey_token') || localStorage.getItem('homey_3d_token') || '',
     slug: bridgeSlug,
-    ip: localStorage.getItem('mz_homey_ip') || (location.hostname && location.hostname !== 'localhost' ? location.hostname : 'homey.local'),
-    haUrl: localStorage.getItem('mz_ha_url') || '',
-    haToken: localStorage.getItem('mz_ha_token') || '',
+    ip: localStorage.getItem('mz_homey_ip') || localStorage.getItem('homey_3d_ip') || (location.hostname && location.hostname !== 'localhost' ? location.hostname : 'homey.local'),
+    haUrl: localStorage.getItem('mz_ha_url') || localStorage.getItem('homey_3d_ha_url') || '',
+    haToken: localStorage.getItem('mz_ha_token') || localStorage.getItem('homey_3d_ha_token') || '',
     values: {},      // Bridge flat key->value map (e.g. "devId:cap": val)
     devices: {},     // Standalone REST devices map
     haEntities: {},  // Home Assistant entities map (entity_id -> state obj)
@@ -296,10 +296,10 @@
   function updateClock() {
     const now = new Date();
     const h = now.getHours();
-    const greetText = h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend';
+    const greetText = h < 11 ? 'Guten Morgen' : h < 18 ? 'Willkommen' : 'Guten Abend';
     document.querySelectorAll('[data-greet]').forEach(el => {
       const name = el.dataset.greet || '';
-      el.textContent = name ? `${greetText}, ${name}` : greetText;
+      el.textContent = name ? `${greetText}, ${name}` : `${greetText} Zuhause`;
     });
     const t = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     const d = now.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -1074,6 +1074,7 @@
     updateMediaArtwork();
     updateMediaProgress();
     updateBridgeModalBadges();
+    updateRoomCountFrom3D();
   }
 
   function fmtMediaSec(sec) {
@@ -1711,7 +1712,10 @@
     const gotoBtn = e.target.closest('[data-goto]');
     if (gotoBtn) {
       const targetName = gotoBtn.dataset.goto.trim();
-      const match = Array.from(document.querySelectorAll('.nav button[data-view]')).find(b => b.textContent.trim() === targetName);
+      const match = Array.from(document.querySelectorAll('.nav button[data-view]')).find(b => {
+        const baseName = (b.childNodes[0]?.textContent || b.textContent).trim();
+        return baseName === targetName || b.textContent.trim() === targetName;
+      });
       if (match) showView(match.dataset.view);
       return;
     }
@@ -1825,10 +1829,10 @@
 
   function sync3dBridgeConfig() {
     try {
-      if (state.ip) localStorage.setItem('homeyIp', state.ip);
-      if (state.token) localStorage.setItem('homeyToken', state.token);
-      if (state.haUrl) localStorage.setItem('haUrl', state.haUrl);
-      if (state.haToken) localStorage.setItem('haToken', state.haToken);
+      if (state.ip) localStorage.setItem('homey_3d_ip', state.ip);
+      if (state.token) localStorage.setItem('homey_3d_token', state.token);
+      if (state.haUrl) localStorage.setItem('homey_3d_ha_url', state.haUrl);
+      if (state.haToken) localStorage.setItem('homey_3d_ha_token', state.haToken);
       const ipEl = document.getElementById('homey-ip');
       const tokEl = document.getElementById('homey-token');
       const haUrlEl = document.getElementById('ha-url');
@@ -1840,10 +1844,68 @@
     } catch {}
   }
 
-  function ensure3dLoaded() {
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event('resize'));
+  let hp3dState = 'idle';
+  function loadScriptSeq(src, optional = false) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = false;
+      s.onload = () => resolve();
+      s.onerror = () => (optional ? resolve() : reject(new Error(`Failed to load ${src}`)));
+      document.body.appendChild(s);
     });
+  }
+
+  async function ensure3dLoaded() {
+    if (hp3dState === 'ready') {
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+      return;
+    }
+    if (hp3dState === 'loading') return;
+    hp3dState = 'loading';
+    const loaderEl = document.getElementById('hp-3d-loading');
+    try {
+      sync3dBridgeConfig();
+      const v = '20261124r';
+      await loadScriptSeq('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+      await loadScriptSeq('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+      await loadScriptSeq(`js/i18n.js?v=${v}`);
+      await loadScriptSeq(`js/scene-core.js?v=${v}`);
+      await loadScriptSeq(`js/devices-3d.js?v=${v}`);
+      await loadScriptSeq(`js/ha-connector.js?v=${v}`);
+      await loadScriptSeq(`js/homey-api.js?v=${v}`);
+      await loadScriptSeq(`js/animations-fpv.js?v=${v}`);
+      await loadScriptSeq(`local/wohnung-daniel.js?v=${v}`, true);
+      await loadScriptSeq(`js/house-editor.js?v=${v}`);
+      if (typeof window.applyTranslations === 'function') window.applyTranslations();
+      sync3dBridgeConfig();
+      if (typeof window.pullConfigFromServerIfNeeded === 'function') {
+        await window.pullConfigFromServerIfNeeded();
+      }
+      if (!window._initialHouseBuilt && typeof window.rebuildHouseScene === 'function') {
+        const h = (Array.isArray(window.savedHouses) && window.activeHouseId && window.activeHouseId !== 'demo')
+          ? window.savedHouses.find(x => x.id === window.activeHouseId) || null
+          : null;
+        window.rebuildHouseScene(h);
+      }
+      if (typeof window.connectToHomey === 'function' && state.ip && state.token) {
+        window.connectToHomey(true);
+      }
+      if (typeof window.connectToHomeAssistant === 'function' && state.haUrl && state.haToken) {
+        window.connectToHomeAssistant(true);
+      }
+      hp3dState = 'ready';
+      if (loaderEl) loaderEl.classList.add('done');
+      maybeShowHouseWizard();
+      if (typeof window.renderRoomsFrom3D === 'function') window.renderRoomsFrom3D();
+      updateRoomCountFrom3D();
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 180);
+    } catch (e) {
+      console.error('3D load error:', e);
+      hp3dState = 'idle';
+      if (loaderEl) loaderEl.innerHTML = '<span>Fehler beim Laden der 3D-Ansicht</span>';
+    }
   }
 
   const modal = document.getElementById('mz-cfg-modal');
@@ -1878,6 +1940,14 @@
     modal.classList.add('open');
   }
   document.getElementById('mz-cfg-close')?.addEventListener('click', () => modal.classList.remove('open'));
+  document.querySelectorAll('[data-cfg-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.cfgTab;
+      document.querySelectorAll('[data-cfg-tab]').forEach(b => b.classList.toggle('on', b === btn));
+      document.getElementById('mz-cfg-panel-bridges').hidden = t !== 'bridges';
+      document.getElementById('mz-cfg-panel-optik').hidden = t !== 'optik';
+    });
+  });
   document.getElementById('mz-cfg-save')?.addEventListener('click', () => {
     state.ip = document.getElementById('mz-cfg-ip').value.trim() || 'homey.local';
     state.token = document.getElementById('mz-cfg-token').value.trim();
@@ -1945,11 +2015,27 @@
       mqLight.addEventListener('change', () => { if (curTheme === 'auto') applyTheme('auto'); });
     }
     const themeIco = { auto: 'theme', light: 'sun', dark: 'moon' };
+    const syncGlobalThemeBtns = () => {
+      document.querySelectorAll('[data-global-theme]').forEach(b => {
+        b.classList.toggle('active', b.dataset.globalTheme === curTheme);
+      });
+    };
+    syncGlobalThemeBtns();
+    document.querySelectorAll('[data-global-theme]').forEach(b => {
+      b.addEventListener('click', () => {
+        curTheme = b.dataset.globalTheme;
+        localStorage.setItem('dash-theme', curTheme);
+        applyTheme(curTheme);
+        tb.innerHTML = svgIco(themeIco[curTheme]);
+        syncGlobalThemeBtns();
+      });
+    });
     const tb = mkBtn('Design wechseln', themeIco[curTheme] || 'theme', () => {
       curTheme = themes[(themes.indexOf(curTheme) + 1) % themes.length];
       localStorage.setItem('dash-theme', curTheme);
       applyTheme(curTheme);
       tb.innerHTML = svgIco(themeIco[curTheme]);
+      syncGlobalThemeBtns();
     });
     bar.appendChild(tb);
 
@@ -1988,12 +2074,19 @@
       }));
     }
 
-    // Homey-Verbindung (⚙️)
+    // Zentrale Einstellungen (immer sichtbar)
     if (!isBridge) {
-      bar.appendChild(mkBtn('Homey-Verbindung', 'wrench', () => {
+      const cfgBtn = document.createElement('button');
+      cfgBtn.type = 'button';
+      cfgBtn.className = 'dash-tool dash-tool-cfg';
+      cfgBtn.title = 'Einstellungen & Bridges';
+      cfgBtn.setAttribute('aria-label', 'Einstellungen');
+      cfgBtn.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Einstellungen</span>`;
+      cfgBtn.addEventListener('click', () => {
         bar.classList.remove('open');
         openCfgModal();
-      }));
+      });
+      bar.appendChild(cfgBtn);
     }
 
     document.body.appendChild(bar);
@@ -2007,27 +2100,207 @@
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  let serverHouseConfigured = false;
   async function loadServerConfig() {
     try {
-      const res = await fetch('config.json', { cache: 'no-store' });
-      if (!res.ok) return;
+      let res = await fetch('/api/config', { cache: 'no-store' }).catch(() => null);
+      if (!res || !res.ok) res = await fetch('config.json', { cache: 'no-store' });
+      if (!res || !res.ok) return;
       const cfg = await res.json();
-      if (cfg?.ip && !localStorage.getItem('mz_homey_ip')) state.ip = String(cfg.ip).trim();
-      if (cfg?.token && !localStorage.getItem('mz_homey_token')) state.token = String(cfg.token).trim();
-      if (cfg?.haUrl && !localStorage.getItem('mz_ha_url')) state.haUrl = String(cfg.haUrl).trim();
-      if (cfg?.haToken && !localStorage.getItem('mz_ha_token')) state.haToken = String(cfg.haToken).trim();
+      const cfgIp = cfg?.connections?.homey?.ip || cfg?.ip || '';
+      const cfgTok = cfg?.connections?.homey?.token || cfg?.token || '';
+      const cfgHaUrl = cfg?.connections?.homeassistant?.url || cfg?.haUrl || '';
+      const cfgHaTok = cfg?.connections?.homeassistant?.token || cfg?.haToken || '';
+      if (cfgIp && !localStorage.getItem('mz_homey_ip') && !localStorage.getItem('homey_3d_ip')) state.ip = String(cfgIp).trim();
+      if (cfgTok && !localStorage.getItem('mz_homey_token') && !localStorage.getItem('homey_3d_token')) state.token = String(cfgTok).trim();
+      if (cfgHaUrl && !localStorage.getItem('mz_ha_url') && !localStorage.getItem('homey_3d_ha_url')) state.haUrl = String(cfgHaUrl).trim();
+      if (cfgHaTok && !localStorage.getItem('mz_ha_token') && !localStorage.getItem('homey_3d_ha_token')) state.haToken = String(cfgHaTok).trim();
+      if ((Array.isArray(cfg?.houses) && cfg.houses.length > 0) || cfg?.house?.mode === 'custom' || (cfg?.defaultHouseId && cfg.defaultHouseId !== 'demo')) {
+        serverHouseConfigured = true;
+      }
+      if (cfg && typeof window.renderRoomsFrom3D === 'function') {
+        window._serverCfgCache = cfg;
+      }
     } catch {}
   }
+
+  window.toggle3dFullscreen = function (explicit) {
+    const next = typeof explicit === 'boolean' ? explicit : !document.body.classList.contains('hp-3d-fullscreen');
+    document.body.classList.toggle('hp-3d-fullscreen', next);
+    const btn = document.getElementById('btn-3d-fullscreen');
+    if (btn) {
+      const ico = btn.querySelector('.btn-icon');
+      const txt = btn.querySelector('.btn-text');
+      if (ico) ico.textContent = next ? '✕' : '⛶';
+      if (txt) txt.textContent = next ? 'Beenden' : 'Vollbild';
+    }
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 120);
+  };
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('hp-3d-fullscreen')) {
+      window.toggle3dFullscreen(false);
+    }
+  });
+
+  function parse3dMapTarget(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    if (raw.startsWith('ha:')) return raw.slice(3);
+    if (raw.startsWith('homey:')) return raw.slice(6);
+    return raw;
+  }
+
+  window.renderRoomsFrom3D = function () {
+    const grid = document.querySelector('.view[data-view="v1"] > .grid');
+    if (!grid) return;
+
+    let rooms = Array.isArray(window.ROOMS) && window.ROOMS.length ? window.ROOMS : null;
+    let mapping = (typeof window.deviceMapping === 'object' && window.deviceMapping) ? window.deviceMapping : null;
+
+    if (!rooms) {
+      try {
+        const houses = JSON.parse(localStorage.getItem('homey_3d_houses') || '[]');
+        const activeId = localStorage.getItem('homey_3d_active_house') || window._serverCfgCache?.activeHouseId || 'demo';
+        const srcHouses = houses.length ? houses : (window._serverCfgCache?.houses || []);
+        const active = srcHouses.find(h => h.id === activeId) || srcHouses[0];
+        if (active && Array.isArray(active.rooms) && active.rooms.length) {
+          rooms = active.rooms;
+        }
+      } catch {}
+    }
+    if (!mapping) {
+      try {
+        mapping = JSON.parse(localStorage.getItem('homey_3d_mapping') || 'null') || window._serverCfgCache?.mapping || {};
+      } catch { mapping = {}; }
+    }
+
+    if (!rooms || !rooms.length) return;
+    const mappedRooms = rooms.map(r => {
+      const devs = (r.devices || []).map(d => {
+        const targetId = parse3dMapTarget(mapping[d.id]);
+        return targetId ? { ...d, targetId } : null;
+      }).filter(Boolean);
+      return { ...r, mappedDevs: devs };
+    });
+
+    grid.innerHTML = mappedRooms.map(r => {
+      const lights = r.mappedDevs.filter(d => d.type === 'light' || d.type === 'led' || d.type === 'nanoleaf' || d.type === 'panel_leds');
+      const lightIds = lights.map(d => d.targetId).join(',');
+      const tempDev = r.mappedDevs.find(d => d.type === 'sensor' && (resolveKey(`${d.targetId}:measure_temperature`) !== undefined));
+      const tilesHtml = r.mappedDevs.filter(d => d.type !== 'sensor').map(d => {
+        if (d.type === 'blinds') {
+          return `<button class="tile rm-blind" data-device="${d.targetId}" data-cap="windowcoverings_set" data-state="off"><span class="t-ico"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-blinds"></use></svg></span><span class="t-name">${d.name}</span><span class="t-val t-st" data-live="${d.targetId}:windowcoverings_set" data-fmt="pct">&#8211;</span></button>`;
+        }
+        const ico = d.type === 'tv' ? '#i-tv' : (d.type === 'speaker' ? '#i-speaker' : (d.type === 'roborock' ? '#i-robot' : '#i-lamp'));
+        const cap = d.type === 'speaker' ? 'speaker_playing' : (d.type === 'roborock' ? 'is_cleaning' : 'onoff');
+        const dimAttr = (d.type === 'light' || d.type === 'led' || d.type === 'nanoleaf') && resolveKey(`${d.targetId}:dim`) !== undefined ? ` data-dim="${d.targetId}:dim"` : '';
+        return `<button class="tile rm-lamp" data-device="${d.targetId}" data-cap="${cap}"${dimAttr} data-state="off"><span class="t-ico"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="${ico}"></use></svg></span><span class="t-name">${d.name}</span><span class="t-val t-st">Aus</span></button>`;
+      }).join('');
+
+      const tempHtml = tempDev
+        ? `<span class="rm-nums"><span class="rm-t" data-cold="18" data-warm="24" data-hot="27"><span data-live="${tempDev.targetId}:measure_temperature" data-fmt="temp">&#8211;</span></span></span>`
+        : '';
+      const macroHtml = lightIds
+        ? `<span class="rm-tag rm-lamps rm-cnt" data-count="${lightIds}|onoff|1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lamp"></use></svg><b class="stat-n">&#8211;</b>/${lights.length}</span>`
+        : '';
+      const macroBtns = lightIds
+        ? `<button type="button" class="rm-on m-on" data-macro="${lightIds}|onoff|true" aria-label="Alles an in ${r.name}" title="Alles an"><span class="t-ico"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lamp"></use></svg></span></button><button type="button" class="rm-off m-off" data-macro="${lightIds}|onoff|false" aria-label="Alles aus in ${r.name}" title="Alles aus"><span class="t-ico"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-power"></use></svg></span></button>`
+        : '';
+
+      return `<div class="card k-room"><h2><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-dot"></use></svg><span>${r.name}</span></h2><div class="room rm2${tempDev ? '' : ' no-temp'}"><div class="rm-head"><button type="button" class="room-open" data-name="${r.name}" onclick="if(typeof focusRoomFromOutside==='function')focusRoomFromOutside('${r.id}')"><span class="rm-ico"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"></use></svg></span><span class="rm-name">${r.name}</span>${tempHtml}${macroHtml}</button>${macroBtns}</div><div class="rm-grid">${tilesHtml || '<div class="muted" style="padding:8px 0">Keine schaltbaren Geräte verknüpft</div>'}</div></div></div>`;
+    }).join('');
+
+    renderAll();
+  };
+
+  function updateRoomCountFrom3D() {
+    let count = 0;
+    if (Array.isArray(window.ROOMS) && window.ROOMS.length) {
+      count = window.ROOMS.length;
+    } else {
+      try {
+        const houses = JSON.parse(localStorage.getItem('homey_3d_houses') || '[]');
+        const activeId = localStorage.getItem('homey_3d_active_house') || 'demo';
+        const active = houses.find(h => h.id === activeId) || houses[0];
+        if (active && Array.isArray(active.rooms)) count = active.rooms.length;
+      } catch {}
+    }
+    if (!count) count = document.querySelectorAll('.view[data-view="v1"] .k-room').length;
+    const navRooms = document.querySelector('.nav button[data-view="v1"]');
+    if (navRooms && count > 0) {
+      let badge = navRooms.querySelector('.nav-cnt');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-cnt';
+        navRooms.appendChild(badge);
+      }
+      badge.textContent = String(count);
+    }
+  }
+
+  function maybeShowHouseWizard() {
+    const wiz = document.getElementById('hp-house-wizard');
+    if (!wiz) return;
+    let hasLocalHouses = false;
+    try {
+      const h = JSON.parse(localStorage.getItem('homey_3d_houses') || '[]');
+      hasLocalHouses = Array.isArray(h) && h.length > 0;
+    } catch {}
+    const hasCustom = serverHouseConfigured || hasLocalHouses || (Array.isArray(window.savedHouses) && window.savedHouses.length > 0);
+    const hasPreset = typeof window.buildWohnungDaniel === 'function';
+    const seen = localStorage.getItem('hp_house_wizard_seen') === '1';
+    if (!hasCustom && !hasPreset && !seen) {
+      wiz.hidden = false;
+    }
+  }
+
+  document.getElementById('hp-wiz-build')?.addEventListener('click', async () => {
+    localStorage.setItem('hp_house_wizard_seen', '1');
+    document.getElementById('hp-house-wizard').hidden = true;
+    showView('v5');
+    await ensure3dLoaded();
+    if (typeof window.toggleSidebar === 'function') window.toggleSidebar(true);
+    if (typeof window.switchSidebarTab === 'function') window.switchSidebarTab('house');
+    if (window.HouseEditor?.addHouse) window.HouseEditor.addHouse('starter');
+    if (window.HouseEditor?.toggle) window.HouseEditor.toggle(true);
+  });
+  document.getElementById('hp-wiz-import')?.addEventListener('click', async () => {
+    localStorage.setItem('hp_house_wizard_seen', '1');
+    document.getElementById('hp-house-wizard').hidden = true;
+    showView('v5');
+    await ensure3dLoaded();
+    document.getElementById('file-import-house')?.click();
+  });
+  document.getElementById('hp-wiz-demo')?.addEventListener('click', () => {
+    localStorage.setItem('hp_house_wizard_seen', '1');
+    document.getElementById('hp-house-wizard').hidden = true;
+    showView('v5');
+  });
 
   if (isBridge) {
     startBridgeRealtime();
   } else {
     loadServerConfig().finally(() => {
       sync3dBridgeConfig();
+      maybeShowHouseWizard();
+      if (typeof window.renderRoomsFrom3D === 'function') window.renderRoomsFrom3D();
       fetchRestData();
       connectHomeyWebSocket();
       fetchHaStates();
       connectHaWebSocket();
     });
   }
+
+  // Direkt-Link Support: ?view=3d & ?fullscreen=1 (oder ?kiosk=1)
+  try {
+    const qp = new URLSearchParams(location.search);
+    const viewParam = (qp.get('view') || '').toLowerCase();
+    const wants3d = viewParam === '3d' || viewParam === 'v5' || qp.get('3d') === '1' || qp.get('3d') === 'fullscreen' || location.hash === '#3d';
+    const wantsFs = qp.get('fullscreen') === '1' || qp.get('3d') === 'fullscreen' || qp.get('kiosk') === '1';
+    if (wants3d) {
+      showView('v5');
+      if (wantsFs) window.toggle3dFullscreen(true);
+    }
+  } catch {}
 })();

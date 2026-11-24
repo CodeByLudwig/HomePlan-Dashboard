@@ -6,6 +6,10 @@ const DEMO_ROOMS = ROOMS;
 window.currentHouseConfig = null;
 
 function switchSidebarTab(tabId) {
+  if (tabId === 'conn' || tabId === 'display' || tabId === 'settings') {
+    document.getElementById('mz-cfg-modal')?.classList.add('open');
+    return;
+  }
   document.querySelectorAll('.sidebar-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
   });

@@ -5,22 +5,30 @@
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=threedotjs)](https://threejs.org/)
 [![PWA Ready](https://img.shields.io/badge/PWA-Ready-5A0FC8)](https://web.dev/progressive-web-apps/)
 
-**HomePlan** vereint das **2D Smart-Home-Dashboard** und das interaktive **3D-Hausmodell (Three.js + Haus-Editor)** in einer einzigen Anwendung – **ohne `<iframe>`**, mit gemeinsamer **Homey Pro & Home Assistant Multi-Bridge**, Dark/Light-Mode, Homey Insights-Charts, Mediensteuerung, Roborock-Integration und iPhone-/PWA-Optimierung.
+**HomePlan** vereint ein modernes **2D Smart-Home-Dashboard** und ein interaktives **3D-Hausmodell (Three.js + Grundriss-Editor)** in einer einzigen Web-App – **ohne `<iframe>`**, mit gemeinsamer **Homey Pro & Home Assistant Multi-Bridge**, zentralen Einstellungen, Dark/Light/Auto-Mode, Homey-Insights-Charts und iPhone-/PWA-Optimierung.
 
 ---
 
-## ✨ Highlights
+## ✨ Features
 
-- **Alles in einer App (ohne `<iframe>`):** Nahtloser Wechsel zwischen *Übersicht*, *Räume*, *Energie & Charts*, *Medien & System*, *Sicherheit* und der nativen *3D-Haus*-Ansicht inkl. 4-Schritte-Haus-Editor & First-Person-Rundgang.
-- **Multi-Bridge (Homey Pro & Home Assistant):**
-  - Gemeinsame Verbindung & `config.json` für beide Oberflächen (2D + 3D).
-  - Live-WebSocket-Updates für beide Bridges sowie Branded Connector-Karten im `⚙️`-Modal.
-- **2D-Dashboard:**
-  - **Medien**: Automatische Album-Cover-Aktualisierung & Song-Fortschritt (`speaker_position` / `speaker_duration` + Laufzeit-Fallback).
-  - **Energie & Insights**: Tagesverbrauch (*Energie heute* nach Raum) + Verlaufscharts (`Heute`, `24h`, `7 Tage`, `30 Tage`) mit Klick-Filter pro Raum/Serie.
-  - **Räume**: Lichter, Dimmer & Rolladen (`Offen` / `Zu` / `%`).
-  - **Roborock Cloud**: Status, Start/Pause/Station/Orten, Raumwahl, Saugkraft & Wischintensität.
-  - **Dark & Light Mode + iPhone Safe-Area:** Vollständiges Dark/Light/Auto-Theme inkl. passendem Sperrbildschirm.
+- **Alles in einer App (ohne `<iframe>`):**
+  - **2D-Dashboard** (*Übersicht*, *Räume*, *Energie & Charts*, *Medien & System*, *Sicherheit*) startet sofort ohne Verzögerung.
+  - **Natives 3D-Haus** (*3D-Haus*-Tab) wird erst bei Bedarf per Lazy-Loading geladen – inkl. 3D-Kamera-Presets, **First-Person-Rundgang**, **4-Schritte-Haus-Editor** und **3D-Vollbildmodus**.
+- **Direkt-Links:**
+  - `index.html?view=3d` → Öffnet direkt die 3D-Ansicht.
+  - `index.html?view=3d&fullscreen=1` → Startet direkt im 3D-Vollbild (auch `?3d=fullscreen` oder `?kiosk=1`).
+- **Zentrale Einstellungen (`⚙️ Einstellungen`) & Multi-Bridge:**
+  - **Homey Pro** (Socket.IO WebSocket + REST API) und **Home Assistant** (WebSocket + REST API) parallel oder einzeln nutzbar.
+  - Einheitliche Konfiguration über `config.json` (bzw. `localStorage`) für 2D **und** 3D.
+  - Globales **Dark / Light / Auto**-Design (inkl. angepasstem Sperrbildschirm) und Sprachauswahl (`Auto / DE / EN`).
+- **Räume & Geräte-Sync:**
+  - Räume und Geräte-Verknüpfungen aus dem 3D-Haus synchronisieren sich automatisch in den **Räume**-Tab (Lichter, Dimmer, Rolladen, TV, Speaker, Sensoren).
+  - Einrichtungs-Wizard beim ersten Start, falls noch kein eigenes Haus angelegt wurde.
+- **Medien, Energie & Sicherheit:**
+  - **Medien:** Automatische Album-Cover-Aktualisierung beim Songwechsel & Song-Fortschritt (`speaker_position`/`speaker_duration` + Laufzeit-Fallback).
+  - **Energie & Insights:** *Energie heute* (Tagesverbrauch & Live-Verteilung nach Raum) sowie Verlaufscharts (`Heute`, `24h`, `7 Tage`, `30 Tage`) mit Klick-Filter pro Raum/Serie.
+  - **Roborock Cloud:** Status, Start/Pause/Station/Orten, gezielte Raumreinigung, Saugkraft & Wischintensität.
+  - **Sicherheit:** Aktiver Schutz-Status (*Schutz AN/AUS*), Protokoll & Alarm-Overlay.
 
 ---
 
@@ -30,11 +38,11 @@
 homeplan/
 ├── index.html            # Einheitliche App (2D-Dashboard + natives #hp-3d-root Canvas)
 ├── css/
-│   ├── dashboard.css     # 2D-Dashboard Dark/Light/Mobile Styles
+│   ├── dashboard.css     # 2D-Dashboard, Dark/Light/Mobile, Modals & 3D-Overlay-Styles
 │   └── 3d.css            # Scoped 3D-Szene, Editor & HUD Styles
 ├── js/
-│   ├── dashboard.js      # 2D-Dashboard, Charts, Media, Roborock & Multi-Bridge
-│   ├── i18n.js           # 3D Mehrsprachigkeit (DE / EN)
+│   ├── dashboard.js      # 2D-Dashboard, Lazy-3D-Loader, Insights, Media, Roborock & Multi-Bridge
+│   ├── i18n.js           # Mehrsprachigkeit (DE / EN)
 │   ├── scene-core.js     # Three.js Szene, Räume, Wände, Rolladen & ResizeObserver
 │   ├── devices-3d.js     # 3D-Geräte, Lichter & Halos
 │   ├── ha-connector.js   # Home Assistant Connector
@@ -45,22 +53,24 @@ homeplan/
 ├── deploy.py             # FTP-Deploy-Script für Homey Micro Web Server
 ├── config.example.json   # Vorlage für Multi-Bridge config.json
 ├── manifest.webmanifest  # PWA-Manifest
-└── sw.js                 # Service Worker
+└── sw.js                 # Service Worker (Network-First)
 ```
 
 ---
 
-## 🚀 Starten
+## 🚀 Starten & Deployment
 
-### Option A: Node.js Server (empfohlen bei Home Assistant wegen `/api/proxy`)
+### Option A: Statisch auf Homey Micro Web Server
+```powershell
+$env:HOMEY_HOST = "192.168.x.x"
+$env:HOMEY_REMOTE_DIR = "/homeplan"
+python deploy.py
+```
+
+### Option B: Node.js Server (empfohlen bei Home Assistant wegen `/api/proxy`)
 ```bash
 node server.js
 ```
 
-### Option B: Statisch auf Homey Micro Web Server
-```powershell
-$env:HOMEY_HOST = "192.168.x.x"
-python deploy.py
-```
-
-*(Für automatische Anmeldung auf allen Geräten `config.example.json` als `config.json` kopieren und IP/Tokens eintragen – `config.json` ist in `.gitignore` ausgeschlossen.)*
+### Konfiguration (`config.json`)
+Kopiere `config.example.json` nach `config.json` und trage dort deine Homey-/Home-Assistant-Zugangsdaten ein (`config.json` und `local/` stehen in `.gitignore` und werden nicht in Git eingecheckt).

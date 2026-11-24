@@ -186,10 +186,10 @@ function updateHouseModeBadge(houseCfg) {
 }
 
 window.rebuildHouseScene = function (houseCfg) {
-  window._initialHouseBuilt = true;
-  clearHouseScene();
   window.currentHouseConfig = houseCfg || null;
   if (!window.HouseEditor) return;
+  window._initialHouseBuilt = true;
+  clearHouseScene();
 
   const isDanielPreset = !!(
     houseCfg &&
@@ -220,6 +220,7 @@ window.rebuildHouseScene = function (houseCfg) {
   }
   updateHouseModeBadge(houseCfg);
   requestSidebarRender(true);
+  if (typeof window.renderRoomsFrom3D === 'function') window.renderRoomsFrom3D();
   if (typeof updateLabels === 'function') updateLabels(true);
 };
 
@@ -354,26 +355,30 @@ async function pullConfigFromServerIfNeeded() {
 
     const cfgIp = (cfg.connections && cfg.connections.homey && cfg.connections.homey.ip) || cfg.ip || '';
     const cfgToken = (cfg.connections && cfg.connections.homey && cfg.connections.homey.token) || cfg.token || '';
-    const cfgHaUrl = (cfg.connections && cfg.connections.homeassistant && cfg.connections.homeassistant.url) || '';
-    const cfgHaToken = (cfg.connections && cfg.connections.homeassistant && cfg.connections.homeassistant.token) || '';
+    const cfgHaUrl = (cfg.connections && cfg.connections.homeassistant && cfg.connections.homeassistant.url) || cfg.haUrl || '';
+    const cfgHaToken = (cfg.connections && cfg.connections.homeassistant && cfg.connections.homeassistant.token) || cfg.haToken || '';
 
-    if (cfgIp && document.getElementById('homey-ip') && !document.getElementById('homey-ip').value) {
-      document.getElementById('homey-ip').value = cfgIp;
+    if (cfgIp) {
+      const el = document.getElementById('homey-ip') || document.getElementById('mz-cfg-ip');
+      if (el && !el.value) el.value = cfgIp;
       localStorage.setItem('homey_3d_ip', cfgIp);
       changedHomey = true;
     }
-    if (cfgToken && document.getElementById('homey-token') && !document.getElementById('homey-token').value) {
-      document.getElementById('homey-token').value = cfgToken;
+    if (cfgToken) {
+      const el = document.getElementById('homey-token') || document.getElementById('mz-cfg-token');
+      if (el && !el.value) el.value = cfgToken;
       localStorage.setItem('homey_3d_token', cfgToken);
       changedHomey = true;
     }
-    if (cfgHaUrl && document.getElementById('ha-url') && !document.getElementById('ha-url').value) {
-      document.getElementById('ha-url').value = cfgHaUrl;
+    if (cfgHaUrl) {
+      const el = document.getElementById('ha-url') || document.getElementById('mz-cfg-ha-url');
+      if (el && !el.value) el.value = cfgHaUrl;
       localStorage.setItem('homey_3d_ha_url', cfgHaUrl);
       changedHa = true;
     }
-    if (cfgHaToken && document.getElementById('ha-token') && !document.getElementById('ha-token').value) {
-      document.getElementById('ha-token').value = cfgHaToken;
+    if (cfgHaToken) {
+      const el = document.getElementById('ha-token') || document.getElementById('mz-cfg-ha-token');
+      if (el && !el.value) el.value = cfgHaToken;
       localStorage.setItem('homey_3d_ha_token', cfgHaToken);
       changedHa = true;
     }
@@ -456,10 +461,10 @@ async function pullConfigFromServerIfNeeded() {
     if (window.HouseEditor && typeof window.HouseEditor.renderHouseSelector === 'function') {
       window.HouseEditor.renderHouseSelector();
     }
-    if (changedHomey && document.getElementById('homey-ip')?.value && document.getElementById('homey-token')?.value) {
+    if (changedHomey && (document.getElementById('homey-ip')?.value || localStorage.getItem('homey_3d_ip')) && (document.getElementById('homey-token')?.value || localStorage.getItem('homey_3d_token'))) {
       connectToHomey(true);
     }
-    if (changedHa && document.getElementById('ha-url')?.value && document.getElementById('ha-token')?.value) {
+    if (changedHa && (document.getElementById('ha-url')?.value || localStorage.getItem('homey_3d_ha_url')) && (document.getElementById('ha-token')?.value || localStorage.getItem('homey_3d_ha_token'))) {
       connectToHomeAssistant(true);
     }
   } catch (e) {}
@@ -556,6 +561,7 @@ function saveMapping(dev3dId, mappedId) {
     localStorage.setItem('homey_3d_mapping', JSON.stringify(deviceMapping));
   } catch (e) {}
   renderSidebar();
+  if (typeof window.renderRoomsFrom3D === 'function') window.renderRoomsFrom3D();
   syncAllBridgesOnce();
   pushConfigToServer(false);
 }
@@ -1631,8 +1637,8 @@ function applyHomeAssistantEntities(byId) {
 }
 
 async function connectToHomey(isSilent = false) {
-  let rawIp = (document.getElementById('homey-ip')?.value || '').trim();
-  const token = (document.getElementById('homey-token')?.value || '').trim();
+  let rawIp = (document.getElementById('homey-ip')?.value || document.getElementById('mz-cfg-ip')?.value || localStorage.getItem('homey_3d_ip') || localStorage.getItem('mz_homey_ip') || '').trim();
+  const token = (document.getElementById('homey-token')?.value || document.getElementById('mz-cfg-token')?.value || localStorage.getItem('homey_3d_token') || localStorage.getItem('mz_homey_token') || '').trim();
   if (!rawIp || !token) {
     if (!isSilent) showToast('⚠️ Bitte Homey IP-Adresse und API-Key eingeben!');
     return;
@@ -1695,8 +1701,8 @@ async function connectToHomey(isSilent = false) {
 
 async function connectToHomeAssistant(isSilent = false) {
   if (!window.HAConnector) return;
-  const rawUrl = (document.getElementById('ha-url')?.value || '').trim();
-  const token = (document.getElementById('ha-token')?.value || '').trim();
+  const rawUrl = (document.getElementById('ha-url')?.value || document.getElementById('mz-cfg-ha-url')?.value || localStorage.getItem('homey_3d_ha_url') || localStorage.getItem('mz_ha_url') || '').trim();
+  const token = (document.getElementById('ha-token')?.value || document.getElementById('mz-cfg-ha-token')?.value || localStorage.getItem('homey_3d_ha_token') || localStorage.getItem('mz_ha_token') || '').trim();
   if (!rawUrl || !token) {
     if (!isSilent) showToast('⚠️ Bitte Home Assistant URL und Token eingeben!');
     return;

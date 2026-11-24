@@ -23,6 +23,7 @@ FILES = [
     "js/homey-api.js",
     "js/animations-fpv.js",
     "js/house-editor.js",
+    "local/wohnung-daniel.js",
 ]
 
 
