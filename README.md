@@ -4,6 +4,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-WebSocket%20%26%20REST-18BCF2?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=threedotjs)](https://threejs.org/)
 [![PWA Ready](https://img.shields.io/badge/PWA-Ready-5A0FC8)](https://web.dev/progressive-web-apps/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 **HomePlan** vereint ein modernes **2D Smart-Home-Dashboard** und ein interaktives **3D-Hausmodell (Three.js + Grundriss-Editor)** in einer einzigen Web-App – **ohne `<iframe>`**, mit gemeinsamer **Homey Pro & Home Assistant Multi-Bridge**, zentralen Einstellungen, Dark/Light/Auto-Mode, Homey-Insights-Charts und iPhone-/PWA-Optimierung.
 
@@ -74,3 +75,10 @@ node server.js
 
 ### Konfiguration (`config.json`)
 Kopiere `config.example.json` nach `config.json` und trage dort deine Homey-/Home-Assistant-Zugangsdaten ein (`config.json` und `local/` stehen in `.gitignore` und werden nicht in Git eingecheckt).
+
+---
+
+## 📄 Lizenz
+
+Dieses Projekt steht unter der [GNU General Public License v3.0 (GPLv3)](LICENSE).  
+Für eine kommerzielle Nutzung ohne Open-Source-Pflicht oder individuelle Anpassungen ist eine separate Lizenzierung auf Anfrage möglich.
